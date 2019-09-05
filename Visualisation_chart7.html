@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <!-- Embed styling in the same html for wordpress -->
+    <style>
+        body { margin:0;position:fixed;top:0;right:0;bottom:0;left:0; }
+        #sbox {
+            border-radius: 25px;
+            border: 2px solid #73AD21;
+            padding: 20px; 
+            width: 300px;
+            height: 50px;
+
+        }
+
+        #searchbutton {
+            height: 50px;
+            width:50px;
+        }
+
+        button, input, select, textarea {
+            font-family : inherit;
+            font-size   : 24px;
+        }
+        .svg-content {
+            display: inline-block;
+            position: relative;
+            top: 0;
+            left: 0;
+        }
+        .svg-container {
+            display: inline-block;
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%;
+            vertical-align: top;
+            overflow: hidden;
+        }
+        #councildata {
+            font-size: 24px;
+            font-family:sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <input id="sbox" type="search" placeholder="Enter Postcode.." name="search">
+    <button id="searchbutton" onclick="filterpostcode()"><i class="fa fa-search"></i></button>
+    <br><br>
+
+    <div id="councildata">
+    </div>
+    <div>
+        <svg id="svgelem" width = "1050" height = "700"></svg>
+    </div>
+
+
+
+    <script>
+        //Define height and width of svg
+        var width=950; 
+        var height=700;
+        var svg = d3.select("#svgelem")
+
+        // Append background image to svg 
+        var myimage = svg.append('image')
+        .attr('xlink:href', 'garbage.jpg')
+        .attr('width', 1050)
+        .attr('height', 700)
+        .attr("opacity",0.4)
+
+
+        function filterpostcode() {
+
+            //Fetch value of entered postcode 
+            var pcode = document.getElementById("sbox").value;
+
+            d3.csv("postcode_lga_mapping.csv", function(error, data) {
+                
+                //Find the council of the enterd postcode
+                postcode_council = data.filter(function(d) {
+                    if(d.Postcode === pcode){
+                        //  console.log(d.Postcode)
+
+                        return d;
+
+                    }
+                });
+                //Error handling code
+                if(postcode_council.length==0){
+                    alert("Please enter a valid postcode of inner metropolitan region");
+                }
+                else {
+                    var div = document.getElementById('councildata');
+
+                    div.innerHTML = 'View projections for ' + postcode_council[0].LGA;
+                    
+                    //Draw the cart for the council
+                    drawchart(postcode_council[0].LGA);
+                }
+
+
+            });
+
+        }
+
+
+        function drawchart(councilname) {
+            //Read csv data file
+            d3.csv("data1.csv", function(error, data) {
+
+                if (error) throw error;
+                councilwisedata = data.filter(function(d){
+                    if(d.CouncilName == councilname) {
+                        if(d.Year === '2014' || d.Year === '2015' || d.Year === '2016'|| d.Year === '2019' ||d.Year === '2025') {
+                            //console.log(d);
+                            return d;
+                        }
+                    }
+
+                });
+                
+                //Define domain and ranges for the axes
+                var xRange = d3.scaleBand().range([80,width-80]).domain(["2014","2015","2016","2019","2025"]);
+                var yRange = d3.scaleLinear().range([height-100, 40]).domain([0, d3.max(councilwisedata, function(d) { return d.Total*60; })]);
+                var xAxis = d3.axisBottom().scale(xRange);
+                var yAxis = d3.axisLeft().scale(yRange);
+
+                //Append g to each data element for text addition later
+                group = svg.selectAll("g")
+                    .data(councilwisedata)
+                    .enter()
+                    .append("g");
+
+                //Define color scale
+                var myColor = d3.scaleLinear().domain([1,8])
+                .range([	"#008080", "#0000FF"])
+                
+                //Draw x axis and append label
+                svg.append("g").style("font-size", "16px").attr("transform","translate(0," + (height-100 )+")").call(xAxis);
+                svg.append("text")
+                    .style("font-size", "20px")
+                    .attr("transform",
+                          "translate(" + (width/2) + " ," + 
+                          (height - 50) + ")")
+                    .style("text-anchor", "middle")
+                    .text("YEAR");
+
+                //Draw y axis and append label
+                svg.append("g").style("font-size", "16px").attr("transform", "translate(100, 10)").call(yAxis);
+
+                svg.append("text")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", 20)
+                    .attr("x",0 - (height / 2))
+                    .attr("dy", "1em")
+                    .style("font-size", "20px")
+                    .style("text-anchor", "middle")
+                    .text("TONNES OF SOFT PLASTIC"); 
+
+                //Draw the bars for data
+                group.selectAll(".bar")
+                    .data(councilwisedata)
+                    .enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", function(d) { return xRange(d.Year)+20; })
+                    .attr("width", xRange.bandwidth()-50)
+                    .attr("height", 0)
+                    .transition()
+                    .duration(200)
+                    .delay(function (d, i) {
+                    return i * 500;
+                })
+                    .attr("y", function(d) { return yRange(d.Total*60); })
+                    .attr("height", function(d) { return (height-100) - yRange(d.Total*60); })
+                    .attr("fill", function(d,i){
+                    if(d.Year==='2025')
+                        return "red";
+                    else {
+                        return myColor(i);
+                    }});
+
+                //Append labels at the top of the bars
+                group.selectAll("text")
+                    .data(councilwisedata)
+                    .enter()
+                    .append("text")
+                    .text(function(d) {
+                    return (Math.round(d.Total*60*100)/100);
+                })
+                    .attr("text-anchor", "middle")
+                    .attr("x", function(d, i) {
+                    return xRange(d.Year)+60;
+                })
+                    .transition()
+                    .duration(200)
+                    .delay(function (d, i) {
+                    return i * 500;
+                })
+                    .attr("y", function(d) {
+                    return (height-100) - 560+ yRange(d.Total*60) ;
+                })
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", "20px")
+                    .attr("fill", "white");
+
+                //Add tooltip to bars
+                group.selectAll(".bar")
+                    .data(councilwisedata)
+                    .append("svg:title")
+                    .text(function(d) { return "Year - " + d.Year + "\nSoft Plastic Waste - " + (Math.round(d.Total*60*100)/100) + " Tonnes"; });
+
+            });}
+    </script>
+</body>
