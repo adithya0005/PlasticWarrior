@@ -89,7 +89,7 @@ button, input, select, textarea {
               }
           });
                if(postcode_council.length==0){
-                   alert("please enter a valid postcode");
+                   alert("Please enter a valid postcode of inner metropolitan region");
                }
                else {
                    var div = document.getElementById('councildata');
@@ -184,9 +184,6 @@ button, input, select, textarea {
           .attr("opacity",0)
          .transition().delay(function(d,i) { return i*500; })
         .attr("opacity",1)
-          
-          elemEnter.append("svg:title")
-          .text("Hello")
     
           
         newrect = svg.append("g")
